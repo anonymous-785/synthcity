@@ -59,6 +59,27 @@ class TimeStepEmbedding(nn.Module):
         return self.fc(emb)
 
 
+class SinusoidalAndEmbeddingLayer(nn.Module):
+    def __init__(self, dim_emb: int, max_time_period: int):
+        super().__init__()
+        self.dim_emb = dim_emb
+        self.max_time_period = max_time_period
+        self.time_to_event_emb = TimeStepEmbedding(dim_emb, max_time_period)
+        
+        self.event_emb = nn.Embedding(embedding_dim=dim_emb,num_embeddings=2)
+
+
+    
+    def forward(self, inputs: Tensor) -> Tensor:
+        time_to_event, event_indicator = inputs[:, 0], inputs[:, 1]
+
+        emb= self.time_to_event_emb(time_to_event)
+        event_emb = self.event_emb(event_indicator.long())
+        # print("sin emb size:",emb.size())
+        # print("event emb size:",event_emb.size())
+        emb += event_emb
+        return emb
+
 class DiffusionModel(nn.Module):
     def __init__(
         self,
@@ -86,10 +107,7 @@ class DiffusionModel(nn.Module):
         self.time_emb = TimeStepEmbedding(dim_emb, max_time_period)
 
         if conditional:
-            if self.num_classes > 0:
-                self.label_emb = nn.Embedding(self.num_classes, dim_emb)
-            elif self.num_classes == 0:  # regression
-                self.label_emb = nn.Linear(1, dim_emb)
+            self.label_emb = SinusoidalAndEmbeddingLayer(dim_emb, max_time_period)
 
         if not model_params:
             model_params = {}  # avoid changing the default dict
@@ -103,15 +121,13 @@ class DiffusionModel(nn.Module):
 
         self.model = get_model(model_type, model_params)
 
-    def forward(self, x: Tensor, t: Tensor, y: Optional[Tensor] = None) -> Tensor:
+    def forward(self, x: torch.Tensor, t: torch.Tensor, y: Optional[torch.Tensor] = None) -> torch.Tensor:
         emb = self.time_emb(t)
         if self.has_label:
             if y is None:
                 raise ValueError("y must be provided if conditional is True")
-            if self.num_classes == 0:
-                y = y.reshape(-1, 1).float()
-            else:
-                y = y.squeeze().long()
+            # z = self.emb_nonlin(self.label_emb(y))
+            # print(z.size())
             emb += self.emb_nonlin(self.label_emb(y))
         x = self.proj(x) + emb
         return self.model(x)
