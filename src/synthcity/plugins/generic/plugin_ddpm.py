@@ -4,7 +4,7 @@ Reference: Kotelnikov, Akim et al. “TabDDPM: Modelling Tabular Data with Diffu
 
 # stdlib
 from pathlib import Path
-from typing import Any, List, Optional, Sequence
+from typing import Any, List, Optional, Sequence, Union
 
 # third party
 import numpy as np
@@ -223,7 +223,7 @@ class TabDDPMPlugin(Plugin):
         if cond is not None:
             if type(cond) is str:
                 cond = df[cond]
-            cond = pd.Series(cond, index=df.index)
+            # cond = pd.Series(cond, index=df.index)
             self.expecting_conditional = True
 
         # NOTE: cond may also be included in the dataframe
